@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Wizard</title>
+  <meta name="theme-color" content="#111827">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js" defer></script>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+<!-- PIN Lock Screen -->
+<div id="pin-screen" class="card" style="display:none; max-width:400px; margin:100px auto; text-align:center;">
+  <h2 id="pin-title">Unlock App</h2>
+  <input type="password" id="pin-input" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Enter PIN" style="width:200px; padding:12px; font-size:24px; text-align:center; letter-spacing:8px; margin:20px 0;">
+  <div style="display:flex; gap:8px; justify-content:center;">
+    <button id="unlock-btn" class="big-btn" style="width:auto; padding:12px 24px;">Unlock</button>
+  </div>
+  <button id="setup-pin-btn" class="big-btn" style="margin-top:20px; background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111; display:none;">Set up PIN</button>
+</div>
+
+<div class="app">
+  <div class="top-bar">
+    <h1 id="app-title">Monthly Budget</h1>
+    <div class="lang-wrap">
+      <label for="langSelect" class="sr-only">Language</label>
+      <select id="langSelect">
+        <option value="en">English</option>
+        <option value="sv">Svenska</option>
+        <option value="ja">日本語</option>
+      </select>
+      <select id="currencySelect" style="display:none; margin-left:8px;">
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+        <option value="GBP">GBP</option>
+      </select>
+      <select id="themeSelect" style="margin-left:8px;">
+        <option value="dark-minimal">Dark Minimal</option>
+        <option value="light-minimal">Light Minimal</option>
+        <option value="neon">Neon</option>
+        <option value="earthy">Earthy</option>
+        <option value="high-contrast">High Contrast</option>
+      </select>
+    </div>
+  </div>
+  <!-- Start menu -->
+  <div id="start-menu" class="card">
+    <h2>What would you like to do?</h2>
+    <button id="remake-btn" class="big-btn" style="margin-bottom:8px;">Remake calculation</button>
+    <button id="review-btn" class="big-btn" style="margin-bottom:8px;">Review / Edit current budget</button>
+    <button id="trends-btn" class="big-btn" style="margin-bottom:8px;">View expense trends</button>
+    <button id="debt-calc-btn" class="big-btn">Debt Payoff Calculator</button>
+  </div>
+
+  <!-- Review / Edit container -->
+  <div id="review-container" class="card" style="display:none;">
+    <h2>Review & Edit</h2>
+    <div id="review-month" style="margin-bottom:8px;"></div>
+    <h3>Incomes</h3>
+    <div id="review-incomes"></div>
+    <h3>Expenses</h3>
+    <div id="review-expenses"></div>
+    <canvas id="reviewChart" width="300" height="300" style="margin-top:12px;"></canvas>
+    <div id="review-totals" style="margin-top:12px;">
+      <p>Total Income: <strong><span id="review-total-income">0</span> <span id="review-currency">SEK</span></strong></p>
+      <p>Total Expenses: <strong><span id="review-total-expenses">0</span> <span id="review-currency">SEK</span></strong></p>
+      <p>Remaining: <strong><span id="review-remaining">0</span> <span id="review-currency">SEK</span></strong></p>
+        <p id="review-remaining-after-5"><span id="review-based-on-remaining-label"><strong>Based on remaining:</strong></span> After saving 5%: <strong><span id="review-remaining-after5-amount">0</span> <span id="review-currency">SEK</span></strong></p>
+        <p id="review-remaining-after-10">After saving 10%: <strong><span id="review-remaining-after10-amount">0</span> <span id="review-currency">SEK</span></strong></p>
+    </div>
+    <div id="review-recommendation" style="margin-top:8px;">
+      <p style="margin-bottom:8px;"><span id="review-based-on-income-label"><strong>Based on income:</strong></span> Recommended savings (5% - 10%)</p>
+      <p id="review-save5">Save 5%: <strong><span id="review-save5-amount">0</span> <span id="review-currency">SEK</span></strong></p>
+      <p id="review-save10">Save 10%: <strong><span id="review-save10-amount">0</span> <span id="review-currency">SEK</span></strong></p>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button id="review-save-btn" class="big-btn">Save Changes</button>
+      <button id="download-review-chart" class="big-btn" style="background:linear-gradient(180deg,#a78bfa,#7c3aed); color:#fff;">Download chart</button>
+      <button id="review-back-btn" class="big-btn" style="background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;">Back</button>
+    </div>
+  </div>
+
+  <!-- Trends container -->
+  <div id="trends-container" class="card" style="display:none;">
+    <h2>Expense Trends</h2>
+    <p>Compare your expenses across different months</p>
+    
+    <div style="margin:12px 0;">
+      <label>Select months to compare (hold Ctrl/Cmd for multiple):</label>
+      <select id="trends-months-select" multiple size="6" style="width:100%; padding:8px; margin-top:4px;">
+      </select>
+    </div>
+    
+    <canvas id="trendsChart" width="400" height="300" style="margin-top:12px;"></canvas>
+    
+    <div id="trends-insights" style="margin-top:12px; padding:12px; background:var(--bg-secondary); border-radius:8px; display:none;">
+      <h4 style="margin-top:0;">Insights:</h4>
+      <div id="trends-insights-content"></div>
+    </div>
+    
+    <button id="trends-back-btn" class="big-btn" style="margin-top:12px; background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;">Back</button>
+  </div>
+
+  <!-- Step-by-step question container -->
+  <div id="question-container" class="card" style="display:none;">
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <button id="auto-fill-btn" class="big-btn" style="flex:1; background:linear-gradient(180deg,#a78bfa,#7c3aed); color:#fff;">Auto-fill from last month</button>
+      <button id="undo-btn" class="big-btn" style="width:80px; background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;" disabled title="Ctrl+Z">↶ Undo</button>
+      <button id="redo-btn" class="big-btn" style="width:80px; background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;" disabled title="Ctrl+Y">↷ Redo</button>
+    </div>
+    
+    <div id="restore-banner" style="display:none; margin-bottom:12px;">
+      <p id="restore-text" style="margin:0 0 8px 0;"></p>
+      <div style="display:flex; gap:8px;">
+        <button id="load-previous-btn" class="big-btn">Load previous data</button>
+        <button id="start-fresh-btn" class="big-btn" style="background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;">Start fresh</button>
+      </div>
+    </div>
+    <h3>Income</h3>
+    <label><input type="checkbox" id="multipleIncome"> I have multiple income sources</label>
+
+    <div id="income-list">
+      <div class="income-row" draggable="true">
+        <input type="text" class="income-name" placeholder="Income name (e.g., Salary)">
+        <input type="number" class="income-amount" placeholder="Amount (SEK)">
+        <select class="income-frequency">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="bi-weekly">Bi-weekly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+        <input type="text" class="income-note" placeholder="Notes (optional, e.g., 'Includes bonus')">
+      </div>
+    </div>
+    <button id="add-income-btn">Add income source</button>
+
+    <h3>Expenses / Bills</h3>
+    <div id="expense-list">
+      <div class="expense-row">
+        <input type="text" class="expense-name" placeholder="Expense name (e.g., Rent)">
+        <input type="number" class="expense-amount" placeholder="Amount (SEK)">
+        <select class="expense-frequency">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="bi-weekly">Bi-weekly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+        <input type="text" class="expense-note" placeholder="Notes (optional, e.g., 'Includes garage')">
+        <label class="recurring-label"><input type="checkbox" class="expense-recurring"> Recurring</label>
+      </div>
+    </div>
+    <button id="add-expense-btn">Add expense</button>
+
+    <div style="margin-top:12px;">
+      <button id="calculate-btn">Calculate</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="card" style="display:none;">
+    <h2>Results</h2>
+    
+    <!-- Monthly Summary Section -->
+    <div id="monthly-summary" style="margin-bottom:16px; padding:12px; background:var(--bg-secondary); border-radius:8px;">
+      <h3 style="margin-top:0;">📊 Monthly Summary</h3>
+      <div id="summary-content"></div>
+    </div>
+    
+    <!-- Warnings Section -->
+    <div id="warnings-section" style="display:none; margin-bottom:16px; padding:12px; background:var(--error-color); color:#fff; border-radius:8px;">
+      <h4 style="margin:0 0 8px 0;">⚠️ <span id="warnings-title">Warnings</span></h4>
+      <div id="warnings-content"></div>
+    </div>
+    
+    <!-- Predictions Section -->
+    <div id="predictions-section" style="display:none; margin-bottom:16px; padding:12px; background:var(--bg-secondary); border-radius:8px;">
+      <h3 style="margin-top:0;" id="predictions-title">Predictions</h3>
+      <p id="prediction-subtitle">Based on average of last 3 months</p>
+      <div id="predictions-content"></div>
+    </div>
+    
+    <p>Total Income: <span id="total-income">0</span> <span id="results-currency">SEK</span></p>
+    <p>Total Expenses: <span id="total-expenses">0</span> <span id="results-currency">SEK</span></p>
+    <p>Remaining: <span id="remaining">0</span> <span id="results-currency">SEK</span></p>
+      <p id="remaining-after-5"><span id="based-on-remaining-label"><strong>Based on remaining:</strong></span> After saving 5%: <strong><span id="remaining-after5-amount">0</span> <span id="results-currency">SEK</span></strong></p>
+      <p id="remaining-after-10">After saving 10%: <strong><span id="remaining-after10-amount">0</span> <span id="results-currency">SEK</span></strong></p>
+
+    <!-- Recommendation: suggest saving 5% - 10% of income -->
+    <div id="recommendation" style="margin-top:12px;">
+      <p id="recommend-range"><span id="based-on-income-label"><strong>Based on income:</strong></span> Recommended savings (5% - 10%)</p>
+      <p id="save5">Save 5%: <strong><span id="save5-amount">0</span> <span id="results-currency">SEK</span></strong></p>
+      <p id="save10">Save 10%: <strong><span id="save10-amount">0</span> <span id="results-currency">SEK</span></strong></p>
+    </div>
+
+    <canvas id="expenseChart" width="400" height="400"></canvas>
+    
+    <button id="export-pdf-btn" class="big-btn" style="margin:12px 0; background:linear-gradient(180deg,#f97316,#ea580c); color:#fff;">📄 Export as PDF</button>
+
+    <!-- Savings Goal Tracker -->
+    <div id="savings-goal-section" style="margin-top:16px; padding:12px; background:var(--bg-secondary); border-radius:8px;">
+      <h3 style="margin-top:0;">Savings Goal</h3>
+      <div style="margin-bottom:12px;">
+        <label for="savings-goal-input">Set monthly savings target:</label>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <input type="number" id="savings-goal-input" placeholder="Enter amount" style="flex:1; padding:8px;">
+          <button id="set-goal-btn" class="big-btn" style="width:auto; padding:8px 16px;">Set Goal</button>
+        </div>
+      </div>
+      <div id="savings-goal-display" style="display:none;">
+        <p>Goal: <strong><span id="goal-amount">0</span> <span id="goal-currency">SEK</span></strong></p>
+        <p>Actual Savings: <strong><span id="actual-savings">0</span> <span id="actual-currency">SEK</span></strong></p>
+        <div style="margin:8px 0;">
+          <div style="background:var(--bg-input); border-radius:8px; height:24px; position:relative; overflow:hidden;">
+            <div id="savings-progress-bar" style="height:100%; background:var(--success-color); width:0%; transition:width 0.3s ease;"></div>
+          </div>
+          <p style="margin-top:4px; text-align:center;"><span id="savings-progress-text">0%</span> of goal achieved</p>
+        </div>
+        <p id="savings-status" style="margin-top:8px;"></p>
+      </div>
+    </div>
+
+    <label for="monthSelect">Compare with past months:</label>
+    <select id="monthSelect">
+      <option value="">Select month</option>
+    </select>
+  </div>
+
+  <!-- Debt Payoff Calculator -->
+  <div id="debt-container" class="card" style="display:none;">
+    <h2>Debt Payoff Calculator</h2>
+    
+    <div id="debt-list" style="margin-bottom:12px;"></div>
+    
+    <button id="add-debt-btn" class="big-btn" style="margin-bottom:12px; background:linear-gradient(180deg,var(--btn-income),var(--btn-income-dark)); color:var(--btn-income-text);">Add Debt</button>
+    
+    <div id="debt-results" style="display:none; margin-top:16px;">
+      <h3>Payment Strategies</h3>
+      <div id="snowball-results" style="margin:12px 0; padding:12px; background:var(--bg-secondary); border-radius:8px;">
+        <h4 style="margin-top:0;">Snowball Method (Smallest first)</h4>
+        <div id="snowball-content"></div>
+      </div>
+      <div id="avalanche-results" style="margin:12px 0; padding:12px; background:var(--bg-secondary); border-radius:8px;">
+        <h4 style="margin-top:0;">Avalanche Method (Highest interest first)</h4>
+        <div id="avalanche-content"></div>
+      </div>
+    </div>
+    
+    <button id="debt-back-btn" class="big-btn" style="margin-top:12px; background:linear-gradient(180deg,#f3f4f6,#e5e7eb); color:#111;">Back</button>
+  </div>
+
+</div>
+
+<script>
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
+  });
+}
+</script>
+
+</body>
+</html>
